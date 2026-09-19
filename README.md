@@ -1,42 +1,56 @@
 # Cart By Port
 
-Java / Spring Boot を用いて開発している、ECサイトを想定したバックエンドAPIです。
+Java / Spring Bootを用いて開発している、ECサイトを想定したバックエンドアプリケーションです。
 
-商品管理APIを起点として、REST API、PostgreSQL、JPA / Hibernate、Validation、例外処理、自動テストなど、バックエンド開発で必要となる要素を段階的に実装しています。
+商品管理APIを起点として、REST API、PostgreSQL、Spring Data JPA / Hibernate、DTO、Validation、例外ハンドリング、トランザクション、自動テストなど、バックエンド開発に必要な要素を段階的に実装しています。
 
-今後はカート・注文機能、Docker、AWS、CI/CD、Reactフロントエンドなどを追加し、実際のWebサービスに近い構成へ発展させる予定です。
+現在は商品管理機能について、CRUD APIの実装だけでなく、JUnit / Mockitoによる単体テスト、MockMvcによるControllerテスト、PostgreSQLを使用した結合テスト、さらにHTTPリクエストからDBまでを通すAPI結合テストまで実装しています。
+
+今後はCart / OrderなどECサイト固有のドメインを追加し、Docker、AWS、CI/CD、React / TypeScriptへ発展させる予定です。
 
 > 現在開発中のポートフォリオです。  
-> 実装済みの機能と今後の予定を分けて記載しています。
+> 実装済みの機能と今後実装予定の機能を分けて記載しています。
 
 ---
 
-## 開発目的
+# 開発目的
 
-単純なCRUD APIを作るだけではなく、以下の技術を実際に組み合わせながら理解することを目的としています。
+単純にCRUD APIを作るだけではなく、
 
-- Java / Spring Bootによるバックエンド開発
-- REST API設計
-- PostgreSQLを用いたデータ永続化
-- Spring Data JPA / Hibernate
-- DTOによる入出力設計
-- Bean Validation
-- 例外ハンドリング
-- トランザクション
-- Dirty Checking
-- JUnit / Mockito / MockMvcによる自動テスト
-- 結合テスト
-- Docker
-- AWS
-- CI/CD
+- なぜController / Service / Repositoryを分離するのか
+- なぜEntityをそのままAPIへ公開しないのか
+- トランザクションはどこで必要になるのか
+- JPAのDirty Checkingはどのように動作するのか
+- 単体テストと結合テストでは何を確認するのか
+- HTTPからデータベースまでをどのようにテストするのか
 
-最終的には、バックエンド・データベース・クラウド・監視・CI/CDまで含めた構成を目指しています。
+といったバックエンド開発の仕組みを理解しながら実装することを目的としています。
+
+最終的には、
+
+```text
+Frontend
+   ↓
+Backend API
+   ↓
+Database
+   ↓
+Docker
+   ↓
+Cloud
+   ↓
+Monitoring
+   ↓
+CI/CD
+```
+
+までを一つのサービスとして構築することを目標としています。
 
 ---
 
-## 技術スタック
+# 技術スタック
 
-### Backend
+## Backend
 
 - Java 21
 - Spring Boot 4.1
@@ -45,25 +59,35 @@ Java / Spring Boot を用いて開発している、ECサイトを想定した�
 - Hibernate
 - Jakarta Bean Validation
 
-### Database
+## Database
 
 - PostgreSQL
 
-### Test
+## Test
 
 - JUnit
 - Mockito
 - MockMvc
 - Spring Boot Test
 
-### Build Tool
+## JSON
+
+- Jackson 3
+
+## Build Tool
 
 - Maven
 - Maven Wrapper
 
-### 今後追加予定
+## Version Control
+
+- Git
+- GitHub
+
+## 今後追加予定
 
 - Docker
+- Docker Compose
 - AWS
   - Amazon ECR
   - Amazon ECS / Fargate
@@ -110,7 +134,7 @@ APIのRequest / ResponseにはDTOを使用し、Entityをそのまま外部へ�
 
 ## 商品管理API
 
-現在、商品に対する基本的なCRUD APIを実装しています。
+商品に対する基本的なCRUD APIを実装しています。
 
 | Method | Endpoint | 内容 |
 |---|---|---|
@@ -120,7 +144,7 @@ APIのRequest / ResponseにはDTOを使用し、Entityをそのまま外部へ�
 | PUT | `/products/{id}` | 商品更新 |
 | DELETE | `/products/{id}` | 商品削除 |
 
-商品データとして現在扱っている主な項目は以下です。
+現在の商品Entityでは、主に以下の情報を扱っています。
 
 ```text
 id
@@ -133,7 +157,7 @@ stock
 
 ---
 
-# 商品登録例
+# 商品登録API
 
 ## Request
 
@@ -170,21 +194,132 @@ HTTP Status:
 
 ---
 
+# 商品取得API
+
+```http
+GET /products/{id}
+```
+
+正常に取得できた場合、
+
+```text
+200 OK
+```
+
+を返します。
+
+例:
+
+```json
+{
+  "id": 1,
+  "name": "キーボード",
+  "price": 5000,
+  "stock": 10,
+  "message": "商品を取得しました"
+}
+```
+
+---
+
+# 商品更新API
+
+```http
+PUT /products/{id}
+Content-Type: application/json
+```
+
+例:
+
+```json
+{
+  "name": "メカニカルキーボード",
+  "price": 7000,
+  "stock": 8
+}
+```
+
+商品更新では `@Transactional` とJPAのDirty Checkingを利用しています。
+
+---
+
+# 商品削除API
+
+```http
+DELETE /products/{id}
+```
+
+正常に削除された場合、
+
+```text
+204 No Content
+```
+
+を返します。
+
+---
+
+# DTO
+
+APIの入出力とEntityの責務を分離するため、Request / Response DTOを使用しています。
+
+```text
+ProductRequest
+ProductResponse
+```
+
+Request側は、
+
+```text
+HTTP Request
+      |
+      v
+ProductRequest
+      |
+      v
+Service
+      |
+      v
+Product Entity
+      |
+      v
+PostgreSQL
+```
+
+Response側は、
+
+```text
+PostgreSQL
+      |
+      v
+Product Entity
+      |
+      v
+ProductResponse
+      |
+      v
+HTTP Response
+```
+
+という流れで処理しています。
+
+Entityを直接HTTPレスポンスとして返さず、APIとして公開する情報をDTOで制御しています。
+
+---
+
 # Validation
 
 商品登録・更新時にはBean Validationを使用しています。
 
-現在、主に以下の入力値をチェックしています。
+## 商品名
 
-### 商品名
-
-空文字や未入力を許可しません。
+未入力や空文字を許可しません。
 
 ```java
 @NotBlank
 ```
 
-### 価格
+## 価格
 
 未入力および負数を許可しません。
 
@@ -193,7 +328,7 @@ HTTP Status:
 @PositiveOrZero
 ```
 
-### 在庫
+## 在庫
 
 未入力および負数を許可しません。
 
@@ -202,7 +337,13 @@ HTTP Status:
 @PositiveOrZero
 ```
 
-不正な値が送信された場合は `400 Bad Request` を返します。
+不正な値が送信された場合は、
+
+```text
+400 Bad Request
+```
+
+を返します。
 
 例:
 
@@ -215,11 +356,25 @@ HTTP Status:
 }
 ```
 
+複数項目に問題がある場合は、複数のValidationエラーをまとめて返します。
+
+例:
+
+```json
+{
+  "message": "入力内容に誤りがあります",
+  "errors": {
+    "stock": "在庫は必須です",
+    "price": "金額は必須です"
+  }
+}
+```
+
 ---
 
 # 例外ハンドリング
 
-`@RestControllerAdvice` を使用して、API全体の例外処理を共通化しています。
+`@RestControllerAdvice` を使用し、API全体の例外処理を共通化しています。
 
 存在しない商品IDが指定された場合は、独自例外である
 
@@ -243,58 +398,13 @@ ProductNotFoundException
 }
 ```
 
-Validationエラーについても、共通の例外ハンドラでレスポンス形式を整えています。
+Validationエラーについても共通の例外ハンドラで処理し、API利用側がエラー内容を判断しやすい形式にしています。
 
 ---
 
-# DTO
+# Repository
 
-APIとデータベースの責務を分離するため、Request / Response DTOを使用しています。
-
-```text
-ProductRequest
-ProductResponse
-```
-
-EntityをそのままAPIレスポンスとして返すのではなく、
-
-```text
-HTTP Request
-      |
-      v
-ProductRequest
-      |
-      v
-Service
-      |
-      v
-Product Entity
-      |
-      v
-PostgreSQL
-```
-
-という形で処理しています。
-
-レスポンスも、
-
-```text
-Product Entity
-      |
-      v
-ProductResponse
-      |
-      v
-HTTP Response
-```
-
-へ変換しています。
-
----
-
-# JPA / Hibernate
-
-データアクセスにはSpring Data JPAを使用しています。
+商品データへのアクセスにはSpring Data JPAを使用しています。
 
 ```java
 public interface ProductRepository
@@ -302,7 +412,7 @@ public interface ProductRepository
 }
 ```
 
-`JpaRepository` が提供する、
+`JpaRepository` から継承した、
 
 ```text
 save()
@@ -314,7 +424,7 @@ existsById()
 
 などを利用しています。
 
-Spring Data JPAの仕組みにより、Repositoryの具体的な実装を自分で作成せずにデータアクセスを行っています。
+Spring Data JPAによってRepositoryの実装が自動生成されるため、基本的なCRUD処理について独自のSQLやRepository実装を作成せずにデータアクセスを行っています。
 
 ---
 
@@ -329,9 +439,29 @@ public ProductResponse updateProduct(...) {
 }
 ```
 
-JPAのManaged Entityに対して値を変更することで、明示的に `save()` を呼び出さなくてもHibernateのDirty CheckingによってUPDATE SQLが発行される構成にしています。
+Repositoryから取得したEntityはPersistence ContextによってManaged Entityとして管理されます。
 
-結合テストでは、実際にPostgreSQLに対してUPDATE SQLが発行され、更新内容が保存されていることも確認しています。
+そのEntityに対して、
+
+```java
+product.setName(...);
+product.setPrice(...);
+product.setStock(...);
+```
+
+のように値を変更することで、明示的に `save()` を呼ばなくてもHibernateのDirty CheckingによってUPDATE SQLが発行されます。
+
+結合テストでは実際に、
+
+```text
+INSERT
+↓
+UPDATE
+↓
+SELECT
+```
+
+を行い、更新内容がPostgreSQLへ反映されていることまで確認しています。
 
 ---
 
@@ -339,9 +469,20 @@ JPAのManaged Entityに対して値を変更することで、明示的に `save
 
 JUnit / Mockito / MockMvc / Spring Boot Testを使用して、自動テストを実装しています。
 
-テストを以下の役割に分けています。
+テストを、
 
-## Service単体テスト
+```text
+単体テスト
+Controllerテスト
+DB結合テスト
+API結合テスト
+```
+
+に分け、それぞれ異なる責務を確認しています。
+
+---
+
+# Service単体テスト
 
 ```text
 ProductService
@@ -352,17 +493,19 @@ Mock ProductRepository
 
 RepositoryをMockitoでMock化し、Serviceのロジック単体を確認しています。
 
-主に以下をテストしています。
+現在、主に以下をテストしています。
 
 - 商品登録
 - 商品取得
-- 存在しない商品の取得
+- 存在しない商品取得時の例外
 - 商品更新
 - 商品削除
 
+Mockを使用することでPostgreSQLへ接続せず、Serviceのロジックだけを独立してテストしています。
+
 ---
 
-## Controllerテスト
+# Controllerテスト
 
 ```text
 MockMvc
@@ -374,7 +517,7 @@ ProductController
 Mock ProductService
 ```
 
-ProductServiceをMock化し、HTTPレイヤーの動作を確認しています。
+ProductServiceをMock化し、Web / Controller層をテストしています。
 
 主に、
 
@@ -384,9 +527,29 @@ ProductServiceをMock化し、HTTPレイヤーの動作を確認しています�
 
 を確認しています。
 
+例えば商品登録APIでは、
+
+```text
+POST /products
+↓
+201 Created
+```
+
+になることや、レスポンスJSONの内容を確認しています。
+
+不正なRequestの場合は、
+
+```text
+400 Bad Request
+```
+
+になることもテストしています。
+
 ---
 
-## PostgreSQL結合テスト
+# PostgreSQL結合テスト
+
+Mockを使用せず、
 
 ```text
 ProductService
@@ -395,47 +558,58 @@ ProductService
 ProductRepository
       |
       v
-JPA / Hibernate
+Spring Data JPA
+      |
+      v
+Hibernate
       |
       v
 PostgreSQL
 ```
 
-Mockを使用せず、本物のPostgreSQLへ接続して確認しています。
+まで実際に接続してテストしています。
+
+## UPDATE
 
 商品更新テストでは、
 
 ```text
 INSERT
-  |
-  v
+↓
+Serviceで更新
+↓
+Dirty Checking
+↓
 UPDATE
-  |
-  v
+↓
+EntityManager.flush()
+↓
+EntityManager.clear()
+↓
 SELECT
 ```
 
-を実際に実行し、Dirty Checkingによる更新がDBへ反映されることを確認しています。
+という流れで、実際にPostgreSQLへ更新内容が保存されていることを確認しています。
 
-商品削除テストでは、
+## DELETE
+
+削除テストでは、
 
 ```text
 INSERT
-  |
-  v
+↓
 DELETE
-  |
-  v
+↓
 SELECT / existsById
 ```
 
-によって、本当にDBから削除されていることを確認しています。
+を実行し、商品が本当にPostgreSQLから削除されたことを確認しています。
 
 ---
 
-## API結合テスト
+# API結合テスト
 
-さらに、
+MockMvcを利用し、APIの入口からPostgreSQLまでを一気通貫で確認する結合テストを実装しています。
 
 ```text
 MockMvc
@@ -450,38 +624,153 @@ Service
 Repository
    |
    v
+Spring Data JPA
+   |
+   v
 Hibernate
    |
    v
 PostgreSQL
 ```
 
-までを一気通貫で確認するテストも実装しています。
+ここではProductServiceやProductRepositoryをMock化せず、実際のSpring BootアプリケーションとPostgreSQLを接続しています。
 
-商品登録APIにHTTPリクエストを送り、
+---
+
+## POST API結合テスト
 
 ```text
 POST /products
+↓
+Controller
+↓
+Service
+↓
+Repository
+↓
+PostgreSQLへINSERT
+↓
+201 Created
+↓
+PostgreSQLから再取得
 ```
 
-から、
+HTTPレスポンスが正しいだけでなく、本当にDBへ商品が保存されたことまで確認しています。
+
+---
+
+## GET API結合テスト
+
+POSTで商品を登録した後、レスポンスJSONから登録された商品のIDを取得します。
 
 ```text
-Controller
-Service
-Repository
-PostgreSQL
+POST /products
+↓
+商品登録
+↓
+レスポンスからid取得
+↓
+GET /products/{id}
+↓
+200 OK
+↓
+登録した商品と同じ内容か確認
 ```
 
-まで実際に処理させたうえで、
+POSTで作成されたリソースを、実際に別のAPIから取得できることを確認しています。
 
-PostgreSQLからデータを再取得し、本当に商品が保存されていることを確認しています。
+---
+
+## PUT API結合テスト
+
+```text
+POST /products
+↓
+商品登録
+↓
+id取得
+↓
+PUT /products/{id}
+↓
+200 OK
+↓
+更新後レスポンスを確認
+↓
+EntityManager.flush()
+↓
+EntityManager.clear()
+↓
+PostgreSQLから再取得
+↓
+DB上の値も更新されていることを確認
+```
+
+APIレスポンスだけではなく、Dirty Checkingによる変更がPostgreSQLまで反映されていることを確認しています。
+
+---
+
+## DELETE API結合テスト
+
+```text
+POST /products
+↓
+商品登録
+↓
+id取得
+↓
+DELETE /products/{id}
+↓
+204 No Content
+↓
+EntityManager.flush()
+↓
+EntityManager.clear()
+↓
+existsById()
+↓
+DBから削除されたことを確認
+```
+
+HTTP上で削除成功になっているだけでなく、PostgreSQL上から実際に商品が消えていることまで確認しています。
+
+---
+
+# APIレスポンスを利用したテスト
+
+API結合テストでは、POSTレスポンスを次のAPI呼び出しへ利用しています。
+
+```text
+POST Response
+{
+  "id": 10,
+  ...
+}
+
+↓
+MvcResult
+
+↓
+Response Body
+
+↓
+JsonMapper / JsonNode
+
+↓
+id取得
+
+↓
+GET /products/10
+PUT /products/10
+DELETE /products/10
+```
+
+これにより、固定IDではなく実際にPostgreSQLによって採番されたIDを使って一連のAPI操作をテストしています。
 
 ---
 
 # テスト実行
 
-以下のコマンドでテストを実行できます。
+以下のコマンドですべてのテストを実行できます。
 
 ```bash
 ./mvnw test
@@ -522,7 +811,7 @@ macOS:
 export CARTBYPORT_DB_PASSWORD='YOUR_PASSWORD'
 ```
 
-その後、Spring Bootを起動します。
+Spring Bootを起動します。
 
 ```bash
 ./mvnw spring-boot:run
@@ -540,7 +829,7 @@ http://localhost:8080
 
 # curl実行例
 
-商品登録:
+## 商品登録
 
 ```bash
 curl -i -X POST http://localhost:8080/products \
@@ -552,19 +841,19 @@ curl -i -X POST http://localhost:8080/products \
 }'
 ```
 
-商品一覧取得:
+## 商品一覧取得
 
 ```bash
 curl -i http://localhost:8080/products
 ```
 
-商品詳細取得:
+## 商品詳細取得
 
 ```bash
 curl -i http://localhost:8080/products/1
 ```
 
-商品更新:
+## 商品更新
 
 ```bash
 curl -i -X PUT http://localhost:8080/products/1 \
@@ -576,7 +865,7 @@ curl -i -X PUT http://localhost:8080/products/1 \
 }'
 ```
 
-商品削除:
+## 商品削除
 
 ```bash
 curl -i -X DELETE http://localhost:8080/products/1
@@ -586,54 +875,97 @@ curl -i -X DELETE http://localhost:8080/products/1
 
 # セキュリティ
 
-データベースパスワードなどの秘密情報はGitリポジトリに含めず、環境変数から取得するようにしています。
-
-例:
+データベースパスワードなどの秘密情報はGitリポジトリに含めず、環境変数から取得しています。
 
 ```properties
 spring.datasource.password=${CARTBYPORT_DB_PASSWORD}
 ```
 
-今後AWSへデプロイする際も、認証情報やシークレットをソースコードへ直接記述しない構成にする予定です。
+今後AWSへデプロイする際も、AWS認証情報やDBパスワードなどの秘密情報をソースコードへ直接記述しない構成にする予定です。
 
 ---
 
 # 今後の開発予定
 
-現在の商品CRUDを土台として、ECサイトとして必要な機能を段階的に追加していきます。
+現在の商品管理APIを土台として、ECサイトとして必要な機能を段階的に追加します。
 
-## EC機能
+---
 
-- Cart（カート）
-- CartItem
-- Order（注文）
-- OrderItem
-- ユーザーと注文の関連付け
-- 商品在庫管理
+## Cart
+
+次のフェーズでは、ショッピングカート機能を実装します。
+
+想定Entity:
+
+```text
+Cart
+CartItem
+Product
+```
+
+想定する機能:
+
+- 商品をカートへ追加
+- 商品数量変更
+- カートから商品削除
+- カート内容取得
+- 合計金額計算
+
+ここでは、
+
+- `@OneToMany`
+- `@ManyToOne`
 - Entity間リレーション
-- 検索
-- ページング
+- 外部キー
+- ドメインロジック
 
-## API設計
+などを扱う予定です。
 
-- REST APIの改善
-- Response設計の改善
-- エラーレスポンスの共通化
-- 検索条件追加
+---
+
+## Order
+
+Cart実装後は注文機能を追加する予定です。
+
+想定Entity:
+
+```text
+Order
+OrderItem
+Product
+```
+
+想定機能:
+
+- 注文作成
+- 注文詳細
+- 注文明細
+- 商品価格の保持
+- 在庫減算
+- トランザクション制御
+
+---
+
+## API
+
+今後、
+
+- 商品検索
 - Pagination
+- Sort
+- APIレスポンス設計改善
+- エラーレスポンス共通化
 - API仕様のドキュメント化
 
-## Test
+なども追加予定です。
 
-- API結合テストの拡充
-- 異常系テストの追加
-- Repositoryテスト
-- Testcontainersの導入検討
-- PostgreSQLテスト環境の分離
+---
 
-## Docker
+# Docker
 
 Spring BootとPostgreSQLをDocker化する予定です。
+
+想定構成:
 
 ```text
 Spring Boot Container
@@ -642,11 +974,13 @@ Spring Boot Container
 PostgreSQL Container
 ```
 
-Docker Composeによるローカル開発環境も構築予定です。
+Docker Composeによるローカル開発環境も構築する予定です。
 
-## AWS
+---
 
-Docker対応後、AWSへのデプロイを予定しています。
+# AWS
+
+Docker対応後はAWSへのデプロイを予定しています。
 
 想定構成:
 
@@ -671,7 +1005,7 @@ Docker Image
 Amazon ECR
 ```
 
-使用予定サービス:
+利用予定サービス:
 
 - Amazon ECR
 - Amazon ECS / Fargate
@@ -679,17 +1013,21 @@ Amazon ECR
 - Amazon S3
 - Amazon CloudWatch
 
-AWSについては、資格学習だけでなく、このアプリケーションを実際にデプロイしながら理解を深める予定です。
+AWSについては資格学習だけではなく、このアプリケーションを実際にデプロイしながら理解を深める予定です。
 
-## CI/CD
+---
 
-GitHub Actionsを利用し、
+# CI/CD
+
+GitHub Actionsを利用したCI/CDも実装予定です。
+
+想定フロー:
 
 ```text
 GitHub Push
      |
      v
-Automated Test
+JUnit / Integration Test
      |
      v
 Build
@@ -704,20 +1042,38 @@ Amazon ECR
 Amazon ECS / Fargate
 ```
 
-というCI/CDパイプラインを構築する予定です。
+コード変更後のテスト・ビルド・デプロイを自動化することを目標としています。
 
-## Frontend
+---
 
-バックエンドAPI完成後は、
+# Frontend
+
+バックエンドAPIの実装後は、
 
 - React
 - TypeScript
 
-を使用してECサイトのフロントエンドを実装予定です。
+を使用してECサイトのフロントエンドを実装する予定です。
 
-## Data / Recommendation
+最終的には、
 
-将来的には購入履歴を利用し、
+```text
+React
+   |
+   v
+Spring Boot REST API
+   |
+   v
+PostgreSQL
+```
+
+という形で、フロントエンドとバックエンドを連携させます。
+
+---
+
+# Data / Recommendation
+
+将来的には購入履歴を利用して、
 
 ```text
 「この商品を購入した人は、
@@ -726,7 +1082,7 @@ Amazon ECS / Fargate
 
 のようなレコメンド機能を追加する予定です。
 
-初期段階ではSQLによる商品の共起分析から実装し、その後データ分析基盤や機械学習への発展も検討しています。
+初期段階ではSQLによる商品の共起分析などから実装し、その後データ分析基盤へ発展させることも検討しています。
 
 ---
 
@@ -761,32 +1117,40 @@ GitHub Actions
 Test / Build / Deploy
 ```
 
-商品・カート・注文といったECドメインの実装だけではなく、
+商品・カート・注文などのECドメインだけでなく、
 
-- Backend
-- Database
-- Test
-- Docker
-- Cloud
-- Monitoring
-- CI/CD
+```text
+Backend
+Database
+Testing
+Docker
+Cloud
+Monitoring
+CI/CD
+```
 
-まで一連の開発を経験できるポートフォリオへ発展させていく予定です。
+まで一連の開発を経験できるポートフォリオへ発展させていきます。
 
 ---
 
 # 現在の開発ステータス
 
-現在は、
+現在は商品管理APIについて、
 
 ```text
 商品CRUD API
      ↓
 PostgreSQL永続化
      ↓
-Validation
+Request / Response DTO
+     ↓
+Bean Validation
      ↓
 例外ハンドリング
+     ↓
+@Transactional
+     ↓
+Dirty Checking
      ↓
 Service単体テスト
      ↓
@@ -794,9 +1158,29 @@ Controllerテスト
      ↓
 PostgreSQL結合テスト
      ↓
-API → PostgreSQL 結合テスト
+POST API結合テスト
+     ↓
+GET API結合テスト
+     ↓
+PUT API結合テスト
+     ↓
+DELETE API結合テスト
 ```
 
 まで実装しています。
 
-次のフェーズでは、商品APIのテストを拡充した後、Cart / OrderなどECサイトの主要ドメイン実装へ進む予定です。
+商品管理機能については、
+
+**API実装 → DB永続化 → Validation → 例外処理 → 単体テスト → DB結合テスト → APIからPostgreSQLまでの一気通貫テスト**
+
+まで一通り実装しました。
+
+次のフェーズでは `Cart / CartItem` を実装し、ProductとのEntityリレーション、数量変更、合計金額計算など、複数のEntityが関係するECドメインの実装へ進みます。
+
+---
+
+# Repository
+
+GitHub:
+
+https://github.com/javapanman11/cart-by-port
